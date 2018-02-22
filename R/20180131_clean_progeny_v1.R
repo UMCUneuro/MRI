@@ -538,18 +538,38 @@ for (x in 1:nrow(dep4)){
   #set(merge1, i = merge1[get(dep4$from[x]) > get(dep4$to[x]), which = TRUE],
   #    j = c(dep4$from[x], dep4$to[x]), value = NA)
 }
+date_errors <- unique(rbindlist(out1,fill=TRUE))
+
+meld_dates1 <- list()
+any_dates1 <- list() 
+for (x in colnames(date_errors)[colnames(date_errors)!="ALSnr"]) {
+  dt1 <- subset(date_errors, subset = TRUE, select = c("ALSnr", x))
+  dt2 <- na.omit(dt1, all.vars = TRUE)
+  
+  if(nrow(dt2)==0){
+    meld_dates1[[x]] <- paste0("No date irregularities for ", x)
+    any_dates1[[x]] <- FALSE
+  } else {
+    any_dates1[[x]] <- TRUE
+    
+    if (any(grepl(x, colnames(d3)))) {
+      set(d3, i = d3[dt2, on = colnames(dt2), which = TRUE], j = x, value = NA)
+      meld_dates1[[x]] <- paste0("Due to irregularities in dates, ",nrow(dt2) ," values for ", x," in object d3 have been set to NA" )
+    } else {
+      collist_long3 <- sapply(long3,colnames)
+      set(long3[[grep(x,collist_long3)]], i= long3[[grep(x,collist_long3)]][dt2, on = colnames(dt2), which = TRUE], j = x, value = NA)
+      meld_dates1[[x]] <- paste0("Due to irregularities in dates, ",nrow(dt2) ," values for ", x," in object long3$",
+                                 names(collist_long3)[grep(x,collist_long3)], " have been set to NA" )
+    }
+  }
+}
 
 
-##### TEST
-# Even een hele wilde opzet
-sapply(sapply(long3,colnames), grep, pattern=paste(colnames(out1[[9]]), collapse = "|"),  value=T)
-test1 <- unique(out1[[9]])
-test1
-test2 <- subset(test1, T,c(ALSnr, DoALSFRS))
-long3$ALSFRS_R[test2,on=colnames(test2),which=T]
-set(long3$ALSFRS_R, i= long3$ALSFRS_R[test2,on=colnames(test2),which=T], j=colnames(test2)[2], value=NA)
-
-#### TEST
+if (any(unlist(any_dates1))){
+  meld_dates1$Note <- paste0("For an overview of all irregular dates, print(date_errors)")
+}
+names(meld_dates1) <- NULL
+mm <- c(mm, list(unlist(meld_dates1)))
 
 new1 <- countNA(merge1, cols = "all")
 reason1 <- "deze datum voor of na een andere datum voorkwam (wat onmogelijk is), zoals bijv. DoO voor DoB."
