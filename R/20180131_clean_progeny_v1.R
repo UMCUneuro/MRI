@@ -30,8 +30,8 @@
 ####################
 
 # package dir
-DIR1 <- "/Volumes/Samsung_T1/Vakantie/HJ/Imaging/R_packages/MRI" # HJ
-#DIR1 <- "/Users/htan4/Documents/Rprojects/MRI" # Harold
+#DIR1 <- "/Volumes/Samsung_T1/Vakantie/HJ/Imaging/R_packages/MRI" # HJ
+DIR1 <- "/Users/htan4/Documents/Rprojects/MRI" # Harold
 
 # source settings
 source(paste0(DIR1, "/R/settings.R"))
@@ -377,7 +377,7 @@ if(any(hier3$check_group==FALSE)){
 
 # Per unieke Group, kijken welke variabelen erbij horen,
 # Resulteert in een lijst van long format data.tables
-wl_transform1 <- sapply(unique(hier3[, Group]), function(i){
+wl_transform1 <- sapply(unique(hier3[check_group == TRUE, Group]), function(i){
   dt1 <- hier3[Group==i,]
   wlong1 <- d3[, c("ALSnr", dt1[, Var]), with = FALSE]
   
@@ -518,20 +518,39 @@ setorder(dep4, -closeness_from, -closeness_to)
 # indien er een fout gevonden wordt, zet dan ook alle variabelen "downstream" (i.e. tussen
 # onderzochte variabele en (in tijd) de laatste variabele, i.e. meestal dood) op NA.
 old1 <- countNA(merge1, cols = "all")
+out1 <- list()
 for (x in 1:nrow(dep4)){
   g2_spath <- igraph::all_shortest_paths(g2, from = dep4$from[x])
   NA1 <- unique(names(unlist(g2_spath$res))) # "downstream" variables
   
   # zet alles op NA wat "downstream" connected is
   # dit is zeer streng maar waarschijnlijk wel het veiligste
-  set(merge1, i = merge1[get(dep4$from[x]) > get(dep4$to[x]), which = TRUE],
-      j = NA1, value = NA)
+  #set(merge1, i = merge1[get(dep4$from[x]) > get(dep4$to[x]), which = TRUE],
+  #    j = NA1, value = NA)
+  
+  #Bovenstaande was de oude methode. Hier mijn voorstel (HT)
+  out1[[x]] <- merge1[get(dep4$from[x]) > get(dep4$to[x]), j=c("ALSnr",NA1), with=F]
+  
+  
   
   # zet zowel "from" als "to" (uit dep4) op NA indien datum niet in de juist opeenvolging staan
   # dit is het strengste wat je kunt doen, maar daardoor voor nu waarschijnlijk wel goed.
   #set(merge1, i = merge1[get(dep4$from[x]) > get(dep4$to[x]), which = TRUE],
   #    j = c(dep4$from[x], dep4$to[x]), value = NA)
 }
+
+
+##### TEST
+# Even een hele wilde opzet
+sapply(sapply(long3,colnames), grep, pattern=paste(colnames(out1[[9]]), collapse = "|"),  value=T)
+test1 <- unique(out1[[9]])
+test1
+test2 <- subset(test1, T,c(ALSnr, DoALSFRS))
+long3$ALSFRS_R[test2,on=colnames(test2),which=T]
+set(long3$ALSFRS_R, i= long3$ALSFRS_R[test2,on=colnames(test2),which=T], j=colnames(test2)[2], value=NA)
+
+#### TEST
+
 new1 <- countNA(merge1, cols = "all")
 reason1 <- "deze datum voor of na een andere datum voorkwam (wat onmogelijk is), zoals bijv. DoO voor DoB."
 mm <- c(mm, list(summaryNA(old1, new1, name_data = "merge1", reason = reason1)))
