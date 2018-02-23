@@ -580,8 +580,14 @@ summ_long1 <- lapply(seq_along(long3), function(i){
   out1 <- summaryNA(old1, new1, name_data = paste0("long4$", names(long4)[i]), reason = reason1  )
   return(out1)
 })
-
-
+summ_long2 <- rbindlist(summ_long1, fill=T)
+#formatting
+summ_long2$Omschrijving <- sapply(summ_long2$Omschrijving, function(i){
+  maxnchar <- max(nchar(summ_long2$Omschrijving))
+  nchar <- nchar(i)
+  out1 <- paste0(i,paste0(rep(" ",maxnchar - nchar), collapse = ""), collapse = "")
+  return(out1)
+})
 
 if (any(unlist(any_dates1))){
   meld_dates1$Note <- paste0("For an overview of all dates set to NA, print(dates_to_NA)")
