@@ -517,41 +517,30 @@ setorder(dep4, -closeness_from, -closeness_to)
 # zet datums op NA indien ze niet voldoen aan het vooraf gedefinieerde sequentiele patroon.
 # indien er een fout gevonden wordt, zet dan ook alle variabelen "downstream" (i.e. tussen
 # onderzochte variabele en (in tijd) de laatste variabele, i.e. meestal dood) op NA.
-old1 <- countNA(merge1, cols = "all")
-lapply(c(list(d3), long3), function(i){
-  print(i)
-  #countNA(unlist(i), cols = colnames(i) %in% names_dep3a)
-})
-
-
-
-
 out1 <- list()
+out2 <- list()
 for (x in 1:nrow(dep4)){
   g2_spath <- igraph::all_shortest_paths(g2, from = dep4$from[x])
+  
+  # Alles downstream van discrepante waardes
   NA1 <- unique(names(unlist(g2_spath$res))) # "downstream" variables
-  
-  # zet alles op NA wat "downstream" connected is
-  # dit is zeer streng maar waarschijnlijk wel het veiligste
-  #set(merge1, i = merge1[get(dep4$from[x]) > get(dep4$to[x]), which = TRUE],
-  #    j = NA1, value = NA)
-  
-  #Bovenstaande was de oude methode. Hier mijn voorstel (HT)
   out1[[x]] <- merge1[get(dep4$from[x]) > get(dep4$to[x]), j=c("ALSnr",NA1), with=F]
   
+  # Alleen discrepante waardes
+  out2[[x]] <- merge1[get(dep4$from[x]) > get(dep4$to[x]), j=c("ALSnr",dep4$from[x],dep4$to[x]), with=F]
   
-  
-  # zet zowel "from" als "to" (uit dep4) op NA indien datum niet in de juist opeenvolging staan
-  # dit is het strengste wat je kunt doen, maar daardoor voor nu waarschijnlijk wel goed.
-  #set(merge1, i = merge1[get(dep4$from[x]) > get(dep4$to[x]), which = TRUE],
-  #    j = c(dep4$from[x], dep4$to[x]), value = NA)
-}
-date_errors <- unique(rbindlist(out1,fill=TRUE))
+
+  }
+dates_to_NA <- unique(rbindlist(out1,fill=TRUE))
+dates_discr <- unique(rbindlist(out2,fill=TRUE))
+
+d4 <- copy(d3)
+long4 <- copy(long3)
 
 meld_dates1 <- list()
 any_dates1 <- list() 
-for (x in colnames(date_errors)[colnames(date_errors)!="ALSnr"]) {
-  dt1 <- subset(date_errors, subset = TRUE, select = c("ALSnr", x))
+for (x in colnames(dates_to_NA)[colnames(dates_to_NA)!="ALSnr"]) {
+  dt1 <- subset(dates_to_NA, subset = TRUE, select = c("ALSnr", x))
   dt2 <- na.omit(dt1, all.vars = TRUE)
   
   if(nrow(dt2)==0){
@@ -560,21 +549,44 @@ for (x in colnames(date_errors)[colnames(date_errors)!="ALSnr"]) {
   } else {
     any_dates1[[x]] <- TRUE
     
-    if (any(grepl(x, colnames(d3)))) {
-      set(d3, i = d3[dt2, on = colnames(dt2), which = TRUE], j = x, value = NA)
-      meld_dates1[[x]] <- paste0("Due to irregularities in dates, ",nrow(dt2) ," values for ", x," in object d3 have been set to NA" )
+    if (any(grepl(x, colnames(d4)))) {
+      set(d4, i = d4[dt2, on = colnames(dt2), which = TRUE], j = x, value = NA)
+      meld_dates1[[x]] <- paste0("Due to irregularities in dates, ",nrow(dt2) ," values for ", x," in object d4 have been set to NA" )
     } else {
-      collist_long3 <- sapply(long3,colnames)
-      set(long3[[grep(x,collist_long3)]], i= long3[[grep(x,collist_long3)]][dt2, on = colnames(dt2), which = TRUE], j = x, value = NA)
-      meld_dates1[[x]] <- paste0("Due to irregularities in dates, ",nrow(dt2) ," values for ", x," in object long3$",
-                                 names(collist_long3)[grep(x,collist_long3)], " have been set to NA" )
+      collist_long4 <- sapply(long4,colnames)
+      set(long4[[grep(x,collist_long4)]], i= long4[[grep(x,collist_long4)]][dt2, on = colnames(dt2), which = TRUE], j = x, value = NA)
+      meld_dates1[[x]] <- paste0("Due to irregularities in dates, ",nrow(dt2) ," values for ", x," in object long4$",
+                                 names(collist_long4)[grep(x,collist_long4)], " have been set to NA" )
     }
   }
 }
 
 
+
+
+
+
+
+
+# Maak summaryNA's
+reason1 <- "deze datum voor of na een andere datum voorkwam (wat onmogelijk is), zoals bijv. DoO voor DoB."
+old1 <- countNA(d3, cols = "all")
+new1 <- countNA(d4, cols = "all")
+summ_cross1 <- summaryNA(old1, new1, name_data = "d4", reason = reason1)
+
+summ_long1 <- lapply(seq_along(long3), function(i){
+  old1 <- countNA(long3[[i]], cols = "all")
+  new1 <- countNA(long4[[i]], cols = "all")
+  out1 <- summaryNA(old1, new1, name_data = paste0("long4$", names(long4)[i]), reason = reason1  )
+  return(out1)
+})
+
+
+
 if (any(unlist(any_dates1))){
-  meld_dates1$Note <- paste0("For an overview of all irregular dates, print(date_errors)")
+  meld_dates1$Note <- paste0("For an overview of all dates set to NA, print(dates_to_NA)")
+  meld_dates1$Note <- paste0("For an overview of all irregular dates, print(dates_discr)")
+
 }
 names(meld_dates1) <- NULL
 mm <- c(mm, list(unlist(meld_dates1)))
