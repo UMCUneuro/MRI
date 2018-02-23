@@ -518,6 +518,14 @@ setorder(dep4, -closeness_from, -closeness_to)
 # indien er een fout gevonden wordt, zet dan ook alle variabelen "downstream" (i.e. tussen
 # onderzochte variabele en (in tijd) de laatste variabele, i.e. meestal dood) op NA.
 old1 <- countNA(merge1, cols = "all")
+lapply(c(list(d3), long3), function(i){
+  print(i)
+  #countNA(unlist(i), cols = colnames(i) %in% names_dep3a)
+})
+
+
+
+
 out1 <- list()
 for (x in 1:nrow(dep4)){
   g2_spath <- igraph::all_shortest_paths(g2, from = dep4$from[x])
