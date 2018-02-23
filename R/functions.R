@@ -65,7 +65,7 @@ summaryNA <- function(old, new, count_var = "orig_Nrow", name_data = "data", rea
   if(length(unique(Nrow))==1){
     df2 <- df1[2,] - df1[1,]
     if(all(unlist(df2)==0)){
-      no_change <- paste0("Data = ", name_data, "; applied function(s)/modification(s) didn't change the number of NA's.")
+      no_change <- data.table(Omschrijving=paste0("Data = ", name_data, "; applied function(s)/modification(s) didn't change the number of NA's."))
       return(no_change)
     }
     df3 <- roundHJ1(df2 / Nrow * 100, digits = 2)
