@@ -571,6 +571,15 @@ if (any(unlist(any_dates1))){
 names(meld_dates1) <- NULL
 mm <- c(mm, list(unlist(meld_dates1)))
 
+###################### TOT HIER
+# To do: 
+# 1. Count NA en summary NA implementeren voor vergelijking.
+# 2. mm Melding maken met alleen de discrepante waardes (voor H2)
+# 3.
+
+
+
+
 new1 <- countNA(merge1, cols = "all")
 reason1 <- "deze datum voor of na een andere datum voorkwam (wat onmogelijk is), zoals bijv. DoO voor DoB."
 mm <- c(mm, list(summaryNA(old1, new1, name_data = "merge1", reason = reason1)))
