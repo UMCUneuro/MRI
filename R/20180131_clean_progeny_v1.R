@@ -588,6 +588,10 @@ summ_long2$Omschrijving <- sapply(summ_long2$Omschrijving, function(i){
   out1 <- paste0(i,paste0(rep(" ",maxnchar - nchar), collapse = ""), collapse = "")
   return(out1)
 })
+mm <- c(mm, list(summ_cross1), list(summ_long2))
+
+
+####### Deel hieronder nog aanpassen.
 
 if (any(unlist(any_dates1))){
   meld_dates1$Note <- paste0("For an overview of all dates set to NA, print(dates_to_NA)")
