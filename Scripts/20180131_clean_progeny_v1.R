@@ -1,3 +1,4 @@
+factorsAsStrings=F
 # clean data Progeny
 # version 0.1
 # date: 31 January 2018
@@ -65,6 +66,7 @@ library(tidyr)
 
 # load data
 d1 <- data.table(read_excel(path = paste0(DIR1, "/Progeny/20180328_progeny.xlsx"), col_types = "text"))
+d1[d1 == 1111] <- NA
 
 format1 <- data.table(read_excel(path = paste0(DIR1, "/Data/Format_v1.xlsx"), sheet = 1))
 dep1 <- data.table(read_excel(path = paste0(DIR1, "/Data/Format_v1.xlsx"), sheet = 2))
@@ -133,6 +135,16 @@ mm <- c(mm, "GOED: kolomnamen in d2 aangepast (conform format2).")
 ####  ADJUST CLASS ####
 #######################
 
+##remove empty columns in progeny
++empty_as_na <- function(x){
++  if("factor" %in% class(x)) x <- as.character(x) ## since ifelse wont work with factors
++  ifelse(as.character(x)!="", x, NA)
++}
++
++## transform all columns
++d2 <- d2 %>% mutate_all(funs(empty_as_na)) 
++d2 <- as.data.table(d2)
+                     
 # adjust class
 old1 <- countNA(d2, cols = "all")
 d2 <- setclass2(d2, cols = rename1[!is.na(Class)]$Rename, new_class = rename1[!is.na(Class)]$Class)
@@ -153,8 +165,13 @@ mm <- c(mm, add_mm(x = summary1, melding = melding1))
 #split rename1 in date en nondate
 rename1_date1 <- rename1[Class=="Date"]
 rename1_nondate1 <- rename1[Class!="Date"]
-
+rename1_date1$Minimum <- as.Date(rename1_date1$Minimum, "%d-%m-%Y")
+                     
 #controleer minimum en maximum voor non-dates
+d2 <- as.data.table(d2)
+oldDF <- as.data.frame(d2)
+oldDF <- oldDF[,colnames(oldDF) %in% rename1_nondate1$Rename]
+                     
 old1 <- countNA(d2, cols = "all")
 for (x in 1:nrow(rename1_nondate1)){
   min1 <- minmax(rename1_nondate1$Minimum[x])
@@ -166,11 +183,35 @@ for (x in 1:nrow(rename1_nondate1)){
     set(d2, i = which(d2[[rename1_nondate1$Rename[x]]] > max1), j = rename1_nondate1$Rename[x], value = NA)
   }
 }
+newDF <- as.data.frame(d2)
+newDF <- newDF[,colnames(newDF) %in% rename1_nondate1$Rename]
+                     
 new1 <- countNA(d2, cols = "all")
 reason1 <- "de waarde van deze variabele(n) niet tussen de gedefinieerde minimale en maximale waarden lag."
 mm <- c(mm, list(summaryNA(old1, new1, name_data = "d2", reason = reason1)))
+                    
+ ###return ALS numbers that did not meet variable requirements: 
+output <- list()
+create.ALSmismatch <- function(x,y) {
+  for (i in names(x)) { 
+    old1 <- x[,i]
+    new1 <- y[,i]
+    ALScolumn <- oldDF[!old1 %in% new1,]
+    output[[paste0("element_", i)]] <-  ALScolumn$ALSnr
+    }
+  output <- ldply (output, data.frame)
+  names(output) <- c("Reason", "ALSnr")
+  return(output) 
+}
 
+ALS.changednondates <- create.ALSmismatch(oldDF, newDF)
+                     
 #controleer minimum en maximum voor dates
+oldDF1 <- as.data.frame(d2)
+oldDF <- oldDF1[,colnames(oldDF1) %in% rename1_date1$Rename]
+oldDF<- oldDF %>% mutate(ALSnr = oldDF1$ALSnr)
+
+                     
 old1 <- countNA(d2, cols = "all")
 for (x in 1:nrow(rename1_date1)){
   min1 <- minmax(rename1_date1$Minimum[x], date = TRUE)
@@ -182,8 +223,85 @@ for (x in 1:nrow(rename1_date1)){
     set(d2, i = which(d2[[rename1_date1$Rename[x]]] > max1), j = rename1_date1$Rename[x], value = NA)
   }
 }
+newDF1 <- as.data.frame(d2)
+newDF <- newDF1[,colnames(newDF1) %in% rename1_date1$Rename]
+newDF<- newDF %>% mutate(ALSnr = newDF1$ALSnr)
+
 new1 <- countNA(d2, cols = "all")
 mm <- c(mm, list(summaryNA(old1, new1, name_data = "d2", reason = reason1)))
+
+###return ALS numbers that did not meet variable requirements: 
+ALS.changeddates <- create.ALSmismatch(oldDF, newDF)
+ALS.changes <- rbind(ALS.changeddates, ALS.changednondates)
+
+#### do more explicit check based on column names in the file: 
+
+##HJ script##
+#dep3 (see dates 700 nog wat)
+dep2a <- dep2[value==1]
+setcolorder(dep2a, c("to", "from", setdiff(names(dep2a), c("from", "to"))))
+setnames(dep2a, old = c("to", "from"), new = c("from", "to"))
+dep2a[, value:=-1]
+dep3 <- rbind(dep2[value!=1], dep2a)[, uitleg:="'from' komt eerder dan 'to'."][]
+if(all(dep3$value==-1)==FALSE){
+  stop("In dep3 zijn niet alle values -1. Oplossen voordat je verder gaat.")
+}
+##HJ script##
+
+testmindep <- lapply(1:length(rownames(dep3)), function(x) d2[[dep3$from[x]]] > d2[[dep3$to[x]]])
+
+comparisons <- unlist(lapply(1, function(x) paste(dep3$from, dep3$to, sep="_")))
+names(testmindep) <-comparisons
+testmindep <- testmindep[lapply(testmindep,length)>0]
+colnamesfordataframe  <- names(testmindep)
+head(testmindep)
+testmin1dep <- dplyr::bind_rows(testmindep)
+collist <- names(testmin1dep)
+
+testmincomb <- cbind(testmin1dep, d2)
+
+cols <- names(testmin1dep)
+testmin1dep[,cols] <- lapply(testmincomb[,cols, with=F], as.numeric)
+
+testmincomb[ ,!names(testmincomb) %in% cols] 
+colskeep <- setdiff(names(testmincomb), cols)
+testmincomb <- testmincomb[,colskeep, with=F]
+
+testmincomb1 <- cbind(testmin1dep, testmincomb)
+testmin1ALS <- as.data.frame(testmincomb1$ALSnr)
+testmincomb1ALS <- testmincomb1$ALSnr
+testmincomb1ALS <- cbind(testmin1dep, testmincomb1ALS)
+
+##find al ALS numbers that did not meet requirements:
+sel <- apply(testmincomb1[,collist, with=F],1,function(row) "1" %in% row)
+testdifmindep <- testmincomb1[sel,]
+
+## wide to long:
+
+sel <- apply(testmincomb1ALS[,collist],1,function(row) "1" %in% row)
+testdifmindepALS <- testmincomb1ALS[sel,]
+
+longformat <- testdifmindepALS %>% tidyr::gather(key=Reason, value=yes)
+
+longformat$ALSnr <- testdifmindepALS$testmincomb1ALS
+longformat <- longformat %>% filter(yes == 1)
+longformat$yes <- NULL
+
+ALS.changesall <- rbind(ALS.changes, longformat)
+
+## remove ALS number that already have been checked:
+ALS.checked <- data.frame("blabla")
+
+ALS.changesallchecked <- ALS.changesall[!ALS.changesall$ALSnr %in% ALS.checked$ALSnr,]
+
+checked_columns <- list(rename1_date1$Original, rename1_nondate1$Original)
+checked_columns <- unlist(checked_columns)
+checked_columns <- as.data.frame(checked_columns)
+
+ALS.changesallchecked <- ALS.changesallchecked %>% arrange(ALSnr)
+
+#write.table(ALS.changesall, file=paste("/Users/rzwambo3/Documents/progeny/ALS_changes_QCscript",Sys.Date(),sep = "_", ".txt"), col.names = T, sep="\t", row.names = F, quote = F) 
+#write.table(checked_columns, file=paste("/Users/rzwambo3/Documents/progeny/checked_columns_QCscript",Sys.Date(),sep = "_", ".txt"), col.names = T, sep="\t", row.names = F, quote = F) 
 
 
 #################################
