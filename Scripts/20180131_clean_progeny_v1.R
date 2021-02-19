@@ -646,7 +646,7 @@ d4 <- c(cross = list(copy(d3)) , copy(long3))
 key1 <- lapply(1:length(d4), function(x){
   #overzicht met kolomnamen per groep
   name1 <- names(d4)[x]
-  name2 <- colnames(d4[[x]])
+  name2 <- copy(colnames(d4[[x]]))
   out1 <- cbind.data.frame(vars = name2, index = rep(paste0("@", name1), length(name2)), n_list = x)
   
   #voeg index toe
